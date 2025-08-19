@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Loan Application Form</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+
+  <div class="max-w-md mx-auto bg-white p-6 rounded shadow-md mt-10">
+    <h2 class="text-xl font-semibold mb-6 text-center">Loan Application Form</h2>
+
+    <form action="/submit" method="POST" id="loanForm" class="space-y-4">
+
+      <!-- Full Name -->
+      <div>
+        <label for="fullName" class="block mb-1 text-sm font-medium">Full Name</label>
+        <input type="text" id="fullName" name="fullName" required
+               class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+
+      <!-- Email -->
+      <div>
+        <label for="email" class="block mb-1 text-sm font-medium">Email Address</label>
+        <input type="email" id="email" name="email" required
+               class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+
+      
+      <!-- Date of Birth & Age -->
+      <div class="flex gap-4">
+        <div class="flex-1">
+          <label for="dateOfBirth" class="block mb-1 text-sm font-medium">Date of Birth</label>
+          <input type="date" id="dateOfBirth" name="dateOfBirth" required
+                 class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div class="flex-1">
+          <label for="age" class="block mb-1 text-sm font-medium">Age</label>
+          <input type="number" id="age" name="age" min="18" required
+                 class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+      </div>
+
+      <!-- Phone -->
+      <div>
+        <label for="phone" class="block mb-1 text-sm font-medium">Phone Number</label>
+        <input type="tel" id="phone" name="phone" required
+               class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+
+      <!-- Loan Amount & Term -->
+      <div class="flex gap-4">
+        <div class="flex-1">
+          <label for="loanAmount" class="block mb-1 text-sm font-medium">Loan Amount</label>
+          <input type="number" id="loanAmount" name="loanAmount" required
+                 class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div class="flex-1">
+          <label for="loanTerm" class="block mb-1 text-sm font-medium">Loan Term (Months)</label>
+          <input type="number" id="loanTerm" name="loanTerm" required
+                 class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+      </div>
+
+      <!-- Employment Status -->
+      <div>
+        <label for="employment" class="block mb-1 text-sm font-medium">Employment Status</label>
+        <select id="employment" name="employment" required
+                class="w-full px-3 py-2 border border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">--select--</option>
+          <option value="employed">Employed</option>
+          <option value="self-employed">Self-Employed</option>
+          <option value="student">Student</option>
+          <option value="unemployed">Unemployed</option>
+        </select>
+      </div>
+
+      <!-- Monthly Income -->
+      <div>
+        <label for="income" class="block mb-1 text-sm font-medium">Monthly Income (Tsh)</label>
+        <input type="number" id="income" name="income" required
+               class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+
+      <!-- Loan Purpose -->
+      <div>
+        <label for="loanPurpose" class="block mb-1 text-sm font-medium">Loan Purpose</label>
+        <textarea id="loanPurpose" name="loanPurpose" required
+                  class="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+      </div>
+
+      <!-- Submit Button -->
+      <div class="text-center">
+        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors w-full">
+          Submit Application
+        </button>
+      </div>
+
+    </form>
+  </div>
+
+<script>
+document.getElementById("loanForm").addEventListener("submit", async function (e) {
+  e.preventDefault(); // prevent form from navigating
+
+  const formData = new FormData(this);
+  const data = Object.fromEntries(formData.entries());
+
+  try {
+    const response = await fetch("/submit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+
+    if (response.ok) {
+      // Redirect to submission page only if backend returns success
+      window.location.href = "submission.html";
+    } else {
+      const text = await response.text();
+      alert("Submission failed: " + text);
+    }
+  } catch (error) {
+    alert("Error submitting form: " + error);
+  }
+});
+</script>
+
+
+</body>
+</html>
