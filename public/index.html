@@ -11,7 +11,7 @@
   <div class="max-w-md mx-auto bg-white p-6 rounded shadow-md mt-10">
     <h2 class="text-xl font-semibold mb-6 text-center">Loan Application Form</h2>
 
-    <form action="/submit" method="POST" id="loanForm" class="space-y-4">
+    <form action="/loan/analyze" method="POST" id="loanForm" class="space-y-4">
 
       <!-- Full Name -->
       <div>
@@ -35,12 +35,21 @@
           <input type="date" id="dateOfBirth" name="dateOfBirth" required
                  class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
         </div>
-        <div class="flex-1">
-          <label for="age" class="block mb-1 text-sm font-medium">Age</label>
-          <input type="number" id="age" name="age" min="18" required
-                 class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-        </div>
+        
       </div>
+
+      <!-- Gender -->
+  <div class="mb-4">
+      <label for="gender" class="block text-gray-700 font-semibold mb-2">Gender</label>
+      <select id="gender" name="gender" required
+            class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:border-blue-300">
+            <option value="">-- Select Gender --</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            
+      </select>
+  </div>
+
 
       <!-- Phone -->
       <div>
@@ -91,42 +100,62 @@
       </div>
 
       <!-- Submit Button -->
-      <div class="text-center">
-        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors w-full">
+      <div class="text-center" >
+        <button type="submit"  id="submitBtn"  class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors w-full">
           Submit Application
         </button>
       </div>
-
+      <!-- Hidden loading indicator -->
+      <div id="loading" class="hidden text-center">
+        <div class="animate-spin h-6 w-6 border-4 border-blue-500 border-t-transparent rounded-full mx-auto"></div>
+        <p class="mt-2 text-gray-600">Submitting, please wait...</p>
+      </div>
     </form>
   </div>
 
-<script>
-document.getElementById("loanForm").addEventListener("submit", async function (e) {
-  e.preventDefault(); // prevent form from navigating
+  <!-- Spinner container -->
+<div id="spinner" class="fixed inset-0 flex items-center justify-center bg-white bg-opacity-75 hidden">
+  <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-600"></div>
+</div>
 
-  const formData = new FormData(this);
-  const data = Object.fromEntries(formData.entries());
+<script>
+  const form = document.getElementById("loanForm");
+const spinner = document.getElementById("spinner");
+const submitBtn = document.getElementById("submitBtn");
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  // Show spinner and disable button
+  spinner.classList.remove("hidden");
+  submitBtn.disabled = true;
+
+  const formData = new FormData(form);
 
   try {
     const response = await fetch("/submit", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+      body: formData,
     });
 
-    if (response.ok) {
-      // Redirect to submission page only if backend returns success
-      window.location.href = "submission.html";
-    } else {
-      const text = await response.text();
-      alert("Submission failed: " + text);
+    if (!response.ok) {
+      alert("Failed to submit form.");
+      spinner.classList.add("hidden");
+      submitBtn.disabled = false;
+      return;
     }
-  } catch (error) {
-    alert("Error submitting form: " + error);
+
+    // Get the redirected URL (submission.html?id=...)
+    const redirectUrl = response.url;
+    window.location.href = redirectUrl;
+
+  } catch (err) {
+    console.error(err);
+    alert("Unexpected error occurred.");
+    spinner.classList.add("hidden");
+    submitBtn.disabled = false;
   }
 });
 </script>
-
-
 </body>
 </html>

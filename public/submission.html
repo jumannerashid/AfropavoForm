@@ -1,20 +1,76 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Submission Success</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loan Submission Confirmation</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 flex items-center justify-center h-screen">
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-4">
 
-  <div class="bg-white p-8 rounded shadow-md text-center max-w-sm">
-    <h1 class="text-2xl font-bold mb-4 text-green-600">Application Submitted!</h1>
-    <p class="mb-6 text-gray-700">Your loan application has been successfully submitted.</p>
-    <a href="index.html" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors">
-      Go Back to Form
-    </a>
+  <div class="bg-white shadow-md rounded-lg p-6 w-full max-w-lg">
+    <h1 class="text-2xl font-bold mb-4 text-center">Submission Confirmation</h1>
+
+    <!-- Spinner using Tailwind -->
+    <div id="spinner" class="w-12 h-12 border-4 border-gray-300 border-t-blue-500 rounded-full animate-spin mx-auto my-6"></div>
+
+    <!-- Submission details -->
+    <div id="submission-details" class="space-y-2 text-gray-700 hidden"></div>
+
+    <div class="text-center mt-6">
+      <a href="index.html" class="text-blue-600 hover:underline">Go Back to Form</a>
+    </div>
   </div>
 
+  <script>
+    async function fetchSubmission() {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get("id");
+      if (!id) return;
+
+      try {
+        const res = await fetch(`/submission/${id}`);
+        const data = await res.json();
+        console.log("data: ",data);
+        // Hide spinner
+        document.getElementById('spinner').classList.add('hidden');
+
+        const container = document.getElementById('submission-details');
+        container.classList.remove('hidden');
+
+        container.innerHTML = `
+          <p>Your submission has been received successfully!</p>
+          <p><strong>Full Name:</strong> ${data.fullName}</p>
+          <p><strong>Email:</strong> ${data.email}</p>
+          <p><strong>Phone:</strong> ${data.phone}</p>
+          <p><strong>Date of Birth:</strong> ${data.dateOfBirth}</p>
+          <p><strong>Gender:</strong> ${data.gender}</p>
+          <p><strong>Loan Amount:</strong> ${data.loanAmount}</p>
+          <p><strong>Loan Term:</strong> ${data.loanTerm}</p>
+          <p><strong>Employment:</strong> ${data.employment}</p>
+          <p><strong>Income:</strong> ${data.income}</p>
+          <p><strong>Loan Purpose:</strong> ${data.loanPurpose}</p>
+          <hr class="my-2">
+          <p class="font-bold">Eligibility</p>
+          <p><strong>Best Product:</strong> ${data.best_product}</p>
+          <p><strong>Eligible:</strong> ${data.eligible}</p>
+          <p><strong>Eligibility Score:</strong> ${data.eligibility_score}</p>
+          <p><strong>Eligibility Reasons:</strong> ${data.eligibility_reasons}</p>
+          <hr class="my-2">
+          <p class="font-bold">Gemini API Analysis</p>
+          <p><strong>Risk Score:</strong> ${data.gemini_score}</p>
+          <p><strong>Recommendation:</strong> ${data.gemini_recommendation}</p>
+        `;
+      } catch (err) {
+        console.error(err);
+        document.getElementById('spinner').classList.add('hidden');
+        const container = document.getElementById('submission-details');
+        container.classList.remove('hidden');
+        container.innerHTML = `<p class="text-red-600">Failed to load submission details.</p>`;
+      }
+    }
+
+    fetchSubmission();
+  </script>
 </body>
 </html>
