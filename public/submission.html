@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Loan Submission Confirmation</title>
+  <title>Submission Confirmation</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-4">
@@ -11,11 +11,19 @@
   <div class="bg-white shadow-md rounded-lg p-6 w-full max-w-lg">
     <h1 class="text-2xl font-bold mb-4 text-center">Submission Confirmation</h1>
 
-    <!-- Spinner using Tailwind -->
+    <!-- Spinner while fetching -->
     <div id="spinner" class="w-12 h-12 border-4 border-gray-300 border-t-blue-500 rounded-full animate-spin mx-auto my-6"></div>
 
     <!-- Submission details -->
     <div id="submission-details" class="space-y-2 text-gray-700 hidden"></div>
+
+    <!-- Apply Button (hidden until eligible) -->
+    <div class="text-center mt-6">
+      <button id="applyBtn"
+        class="hidden bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 transition">
+        Apply for Loan
+      </button>
+    </div>
 
     <div class="text-center mt-6">
       <a href="index.html" class="text-blue-600 hover:underline">Go Back to Form</a>
@@ -23,44 +31,73 @@
   </div>
 
   <script>
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("id");
+
     async function fetchSubmission() {
-      const params = new URLSearchParams(window.location.search);
-      const id = params.get("id");
       if (!id) return;
 
       try {
-        const res = await fetch(`/submission/${id}`);
+        const res = await fetch(`/loans/${id}`);
+        if (!res.ok) throw new Error("Failed to fetch submission");
+
         const data = await res.json();
-        console.log("data: ",data);
+        console.log("Fetched submission:", data);
+
         // Hide spinner
         document.getElementById('spinner').classList.add('hidden');
 
+        // Show submission details
         const container = document.getElementById('submission-details');
         container.classList.remove('hidden');
 
         container.innerHTML = `
           <p>Your submission has been received successfully!</p>
-          <p><strong>Full Name:</strong> ${data.fullName}</p>
-          <p><strong>Email:</strong> ${data.email}</p>
-          <p><strong>Phone:</strong> ${data.phone}</p>
-          <p><strong>Date of Birth:</strong> ${data.dateOfBirth}</p>
-          <p><strong>Gender:</strong> ${data.gender}</p>
-          <p><strong>Loan Amount:</strong> ${data.loanAmount}</p>
-          <p><strong>Loan Term:</strong> ${data.loanTerm}</p>
-          <p><strong>Employment:</strong> ${data.employment}</p>
-          <p><strong>Income:</strong> ${data.income}</p>
-          <p><strong>Loan Purpose:</strong> ${data.loanPurpose}</p>
+          <p><strong>Full Name:</strong> ${data.fullName || "N/A"}</p>
+          <p><strong>Email:</strong> ${data.email || "N/A"}</p>
+          <p><strong>Phone:</strong> ${data.phone || "N/A"}</p>
+          <p><strong>Date of Birth:</strong> ${data.dateOfBirth || "N/A"}</p>
+          <p><strong>Gender:</strong> ${data.gender || "N/A"}</p>
+          <p><strong>Loan Amount:</strong> ${data.loanAmount || "N/A"}</p>
+          <p><strong>Loan Term:</strong> ${data.loanTerm || "N/A"}</p>
+          <p><strong>Employment:</strong> ${data.employment || "N/A"}</p>
+          <p><strong>Income:</strong> ${data.income || "N/A"}</p>
+          <p><strong>Loan Purpose:</strong> ${data.loanPurpose || "N/A"}</p>
           <hr class="my-2">
           <p class="font-bold">Eligibility</p>
-          <p><strong>Best Product:</strong> ${data.best_product}</p>
-          <p><strong>Eligible:</strong> ${data.eligible}</p>
-          <p><strong>Eligibility Score:</strong> ${data.eligibility_score}</p>
-          <p><strong>Eligibility Reasons:</strong> ${data.eligibility_reasons}</p>
+          <p><strong>Best Product:</strong> ${data.best_product || "N/A"}</p>
+          <p><strong>Eligible:</strong> ${data.eligible || "No"}</p>
+          <p><strong>Eligibility Score:</strong> ${data.eligibility_score || 0}</p>
+          <p><strong>Eligibility Reasons:</strong> ${data.eligibility_reasons || "N/A"}</p>
           <hr class="my-2">
           <p class="font-bold">Gemini API Analysis</p>
-          <p><strong>Risk Score:</strong> ${data.gemini_score}</p>
-          <p><strong>Recommendation:</strong> ${data.gemini_recommendation}</p>
+          <p><strong>Risk Score:</strong> ${data.gemini_score || 0}</p>
+          <p><strong>Recommendation:</strong> ${data.gemini_recommendation || "N/A"}</p>
+          <p><strong>Reasoning:</strong> ${data.gemini_reasoning || "N/A"}</p>
         `;
+
+        // Show apply button if eligible
+        if (data.eligible === "Yes") {
+          const applyBtn = document.getElementById("applyBtn");
+          applyBtn.classList.remove("hidden");
+
+          applyBtn.onclick = async () => {
+            try {
+              const res = await fetch(`/api/loan/${id}/apply`, { method: "POST" });
+              const result = await res.json();
+              if (result.success) {
+                applyBtn.textContent = "Applied ✅";
+                applyBtn.disabled = true;
+              } else {
+                alert("Failed to apply: " + result.message);
+              }
+            } catch (err) {
+              console.error(err);
+              alert("Something went wrong while applying.");
+            }
+          };
+        }
+
       } catch (err) {
         console.error(err);
         document.getElementById('spinner').classList.add('hidden');

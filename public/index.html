@@ -11,7 +11,7 @@
   <div class="max-w-md mx-auto bg-white p-6 rounded shadow-md mt-10">
     <h2 class="text-xl font-semibold mb-6 text-center">Loan Application Form</h2>
 
-    <form action="/loan/analyze" method="POST" id="loanForm" class="space-y-4">
+    <form action="/submit" method="POST" id="loanForm" class="space-y-4">
 
       <!-- Full Name -->
       <div>
@@ -119,43 +119,32 @@
 </div>
 
 <script>
-  const form = document.getElementById("loanForm");
-const spinner = document.getElementById("spinner");
-const submitBtn = document.getElementById("submitBtn");
+    const form = document.getElementById("loanForm");
+    const spinner = document.getElementById("spinner");
 
-form.addEventListener("submit", async (e) => {
-  e.preventDefault();
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      spinner.classList.remove("hidden");
 
-  // Show spinner and disable button
-  spinner.classList.remove("hidden");
-  submitBtn.disabled = true;
+      const formData = new FormData(form);
 
-  const formData = new FormData(form);
+      try {
+        const res = await fetch("/submit", { method: "POST", body: formData });
+        const data = await res.json();
 
-  try {
-    const response = await fetch("/submit", {
-      method: "POST",
-      body: formData,
+        if (data.id) {
+          // Redirect to submission page with inserted record id
+          window.location.href = `submission.html?id=${data.id}`;
+        } else {
+          alert("Submission failed. Please try again.");
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Unexpected error occurred.");
+      } finally {
+        spinner.classList.add("hidden");
+      }
     });
-
-    if (!response.ok) {
-      alert("Failed to submit form.");
-      spinner.classList.add("hidden");
-      submitBtn.disabled = false;
-      return;
-    }
-
-    // Get the redirected URL (submission.html?id=...)
-    const redirectUrl = response.url;
-    window.location.href = redirectUrl;
-
-  } catch (err) {
-    console.error(err);
-    alert("Unexpected error occurred.");
-    spinner.classList.add("hidden");
-    submitBtn.disabled = false;
-  }
-});
-</script>
+  </script>
 </body>
 </html>

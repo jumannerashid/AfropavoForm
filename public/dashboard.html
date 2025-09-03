@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loan Management Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 font-sans flex">
+
+  <!-- Sidebar -->
+  <aside class="w-64 bg-white h-screen fixed shadow-xl z-10 flex flex-col">
+    <div class="p-6 border-b">
+      <h1 class="text-2xl font-bold text-primary text-center flex items-center justify-center">
+        <i class="fas fa-hand-holding-usd mr-2 text-secondary"></i>
+        Loan<span class="text-secondary">Manager</span>
+      </h1>
+    </div>
+    <nav class="mt-8 flex-1">
+      <a href="#" class="flex items-center py-3 px-6 bg-primary/10 text-primary border-l-4 border-primary font-medium">
+        <i class="fas fa-home mr-3"></i> Dashboard
+      </a>
+      <a href="#" class="flex items-center py-3 px-6 hover:bg-gray-100 text-gray-700">
+        <i class="fas fa-file-alt mr-3"></i> Applications
+      </a>
+      <a href="#" class="flex items-center py-3 px-6 hover:bg-gray-100 text-gray-700">
+        <i class="fas fa-chart-bar mr-3"></i> Analytics
+      </a>
+      <a href="#" class="flex items-center py-3 px-6 hover:bg-gray-100 text-gray-700">
+        <i class="fas fa-cog mr-3"></i> Settings
+      </a>
+    </nav>
+    <div class="p-6 border-t">
+      <button class="w-full bg-primary text-white py-2 rounded-lg shadow hover:bg-secondary transition">
+        <i class="fas fa-sign-out-alt mr-2"></i> Logout
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="ml-64 flex-1 min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-white shadow-sm py-4 px-6 flex justify-between items-center sticky top-0 z-10">
+      <div class="flex items-center">
+        <input type="search" placeholder="Search applications..."
+          class="px-4 py-2 border rounded-l-lg focus:outline-none focus:ring-2 focus:ring-primary w-72">
+        <button
+          class="bg-primary text-white px-4 py-2 rounded-r-lg hover:bg-secondary transition">Search</button>
+      </div>
+      <div class="flex items-center space-x-6">
+        <div class="relative">
+          <button class="text-gray-500 hover:text-gray-700">
+            <i class="fas fa-bell text-xl"></i>
+            <span
+              class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full text-xs w-5 h-5 flex items-center justify-center">3</span>
+          </button>
+        </div>
+        <div class="flex items-center">
+          <span class="text-gray-700 font-medium">Admin User</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Stats Overview -->
+    <section class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div class="bg-white rounded-2xl shadow hover:shadow-lg p-6 text-center transition">
+        <div class="text-4xl font-extrabold text-primary" id="total-applications">0</div>
+        <p class="text-gray-500 mt-2">Total Applications</p>
+      </div>
+      <div class="bg-white rounded-2xl shadow hover:shadow-lg p-6 text-center transition">
+        <div class="text-4xl font-extrabold text-yellow-500" id="pending-applications">0</div>
+        <p class="text-gray-500 mt-2">Pending Review</p>
+      </div>
+      <div class="bg-white rounded-2xl shadow hover:shadow-lg p-6 text-center transition">
+        <div class="text-4xl font-extrabold text-green-500" id="approved-applications">0</div>
+        <p class="text-gray-500 mt-2">Approved</p>
+      </div>
+      <div class="bg-white rounded-2xl shadow hover:shadow-lg p-6 text-center transition">
+        <div class="text-4xl font-extrabold text-red-500" id="rejected-applications">0</div>
+        <p class="text-gray-500 mt-2">Rejected</p>
+      </div>
+    </section>
+
+    <!-- Loan Applications Table -->
+    <section class="p-6 flex-1">
+      <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+        <div class="px-6 py-4 border-b flex justify-between items-center">
+          <h2 class="text-xl font-semibold text-gray-800">Loan Applications</h2>
+          <select
+            class="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary bg-gray-50"
+            id="status-filter">
+            <option value="">All Statuses</option>
+            <option value="Pending">Pending</option>
+            <option value="Approved">Approved</option>
+            <option value="Rejected">Rejected</option>
+          </select>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-gray-50 text-left text-gray-600 uppercase tracking-wider">
+                <th class="px-6 py-3">ID</th>
+                <th class="px-6 py-3">Applicant</th>
+                <th class="px-6 py-3">Loan Amount</th>
+                <th class="px-6 py-3">Application Date</th>
+                <th class="px-6 py-3">Status</th>
+                <th class="px-6 py-3">Best Product</th>
+                <th class="px-6 py-3">Eligibility Reasons</th>
+                <th class="px-6 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="loan-table-body" class="divide-y"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Editable Modal -->
+  <div id="loan-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-xl w-96 p-6 relative shadow-xl">
+      <button onclick="closeModal()" class="absolute top-3 right-3 text-gray-500 hover:text-gray-700 text-lg">&times;</button>
+      <h2 class="text-xl font-bold mb-4">Edit Loan Details</h2>
+      <div class="space-y-3 text-gray-700">
+        <input type="hidden" id="modal-loan-id">
+        <div><label class="font-medium">Name:</label> <input id="modal-name" class="w-full border rounded px-2 py-1"></div>
+        <div><label class="font-medium">Email:</label> <input id="modal-email" class="w-full border rounded px-2 py-1"></div>
+        <div><label class="font-medium">Amount:</label> <input type="number" id="modal-amount" class="w-full border rounded px-2 py-1"></div>
+        <div><label class="font-medium">Purpose:</label> <input id="modal-purpose" class="w-full border rounded px-2 py-1"></div>
+        <div><label class="font-medium">Term:</label> <input id="modal-term" class="w-full border rounded px-2 py-1"></div>
+        <div><label class="font-medium">Status:</label>
+          <select id="modal-status" class="w-full border rounded px-2 py-1">
+            <option value="Pending">Pending</option>
+            <option value="Approved">Approved</option>
+            <option value="Rejected">Rejected</option>
+          </select>
+        </div>
+        <div><label class="font-medium">Best Product:</label> <input id="modal-best-product" class="w-full border rounded px-2 py-1" readonly></div>
+        <div><label class="font-medium">Eligibility Reasons:</label> <textarea id="modal-eligibility-reasons" class="w-full border rounded px-2 py-1" readonly></textarea></div>
+        <div><label class="font-medium">Gemini Reasoning:</label> <textarea id="modal-gemini-reasoning" class="w-full border rounded px-2 py-1" readonly></textarea></div>
+        <div><label class="font-medium">Eligibility Score:</label> <input id="modal-eligibility-score" class="w-full border rounded px-2 py-1" readonly></div>
+        <div class="flex justify-end mt-4 space-x-2">
+          <button onclick="closeModal()" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 transition">Cancel</button>
+          <button onclick="saveModalChanges()" class="px-4 py-2 bg-primary text-white rounded hover:bg-secondary transition">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dashboard JS -->
+  <script>
+const totalEl = document.getElementById('total-applications');
+const pendingEl = document.getElementById('pending-applications');
+const approvedEl = document.getElementById('approved-applications');
+const rejectedEl = document.getElementById('rejected-applications');
+const tableBody = document.getElementById('loan-table-body');
+const statusFilter = document.getElementById('status-filter');
+const modal = document.getElementById('loan-modal');
+
+async function fetchLoanData() {
+  try {
+    const res = await fetch('/loans');
+    const data = await res.json();
+
+    // Compute status for display
+    data.forEach(l => {
+      if (!l.eligible) l.status = "Pending";
+      else if (l.eligible === "Yes") l.status = "Approved";
+      else if (l.eligible === "No") l.status = "Rejected";
+    });
+
+    let filteredData = data;
+    const filterStatus = statusFilter.value;
+    if (filterStatus) filteredData = data.filter(l => l.status === filterStatus);
+
+    // Summary
+    totalEl.textContent = data.length;
+    pendingEl.textContent = data.filter(l => l.status === 'Pending').length;
+    approvedEl.textContent = data.filter(l => l.status === 'Approved').length;
+    rejectedEl.textContent = data.filter(l => l.status === 'Rejected').length;
+
+    // Table rows
+    tableBody.innerHTML = filteredData.map(loan => {
+      const statusClass = loan.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
+                          loan.status === 'Approved' ? 'bg-green-100 text-green-800' :
+                          'bg-red-100 text-red-800';
+
+      return `
+      <tr class="hover:bg-gray-50">
+        <td class="px-6 py-4 font-medium">#${loan.id}</td>
+        <td class="px-6 py-4">${loan.fullName || '-'}</td>
+        <td class="px-6 py-4">$${Number(loan.loanAmount).toLocaleString()}</td>
+        <td class="px-6 py-4">${new Date(loan.created_at).toLocaleDateString()}</td>
+        <td class="px-6 py-4">
+          <span class="px-3 py-1 rounded-full text-xs font-medium ${statusClass}">${loan.status}</span>
+        </td>
+        <td class="px-6 py-4">${loan.best_product || '-'}</td>
+        <td class="px-6 py-4">${loan.eligibility_reasons || '-'}</td>
+        <td class="px-6 py-4 flex justify-end space-x-2">
+          <button class="bg-primary text-white px-3 py-1 rounded hover:bg-secondary transition" onclick="editLoan(${loan.id})">Edit</button>
+          <button class="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 transition" ${loan.status === 'Approved' ? 'disabled opacity-50 cursor-not-allowed' : ''} onclick="updateStatus(${loan.id}, 'Approved')">Approve</button>
+          <button class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition" ${loan.status === 'Rejected' ? 'disabled opacity-50 cursor-not-allowed' : ''} onclick="updateStatus(${loan.id}, 'Rejected')">Reject</button>
+        </td>
+      </tr>`;
+    }).join('');
+
+  } catch (err) {
+    console.error("Error fetching loans:", err);
+  }
+}
+
+async function updateStatus(id, status) {
+  await fetch(`/loans/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status })
+  });
+  fetchLoanData();
+}
+
+function editLoan(id) {
+  fetch(`/loans/${id}`)
+    .then(res => res.json())
+    .then(loan => {
+      document.getElementById('modal-loan-id').value = loan.id;
+      document.getElementById('modal-name').value = loan.fullName || '';
+      document.getElementById('modal-email').value = loan.email || '';
+      document.getElementById('modal-amount').value = loan.loanAmount || '';
+      document.getElementById('modal-purpose').value = loan.loanPurpose || '';
+      document.getElementById('modal-term').value = loan.loanTerm || '';
+      document.getElementById('modal-status').value = loan.status || 'Pending';
+      document.getElementById('modal-best-product').value = loan.best_product || '';
+      document.getElementById('modal-eligibility-reasons').value = loan.eligibility_reasons || '';
+      document.getElementById('modal-gemini-reasoning').value = loan.gemini_reasoning || '';
+      document.getElementById('modal-eligibility-score').value = loan.eligibility_score || '';
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    });
+}
+
+async function saveModalChanges() {
+  const id = document.getElementById('modal-loan-id').value;
+  const updates = {
+    fullName: document.getElementById('modal-name').value,
+    email: document.getElementById('modal-email').value,
+    loanAmount: parseFloat(document.getElementById('modal-amount').value),
+    loanPurpose: document.getElementById('modal-purpose').value,
+    loanTerm: document.getElementById('modal-term').value,
+    status: document.getElementById('modal-status').value,
+  };
+  await fetch(`/loans/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates)
+  });
+  closeModal();
+  fetchLoanData();
+}
+
+function closeModal() {
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+}
+
+statusFilter.addEventListener('change', fetchLoanData);
+document.addEventListener('DOMContentLoaded', fetchLoanData);
+  </script>
+</body>
+</html>
