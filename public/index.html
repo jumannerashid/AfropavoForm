@@ -6,12 +6,17 @@
   <title>Loan Application Form</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100">
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
 
-  <div class="max-w-md mx-auto bg-white p-6 rounded shadow-md mt-10">
+  <div class="w-full max-w-md bg-white p-6 rounded shadow-md relative">
     <h2 class="text-xl font-semibold mb-6 text-center">Loan Application Form</h2>
 
-    <form action="/submit" method="POST" id="loanForm" class="space-y-4">
+    <!-- Spinner overlay -->
+    <div id="spinnerOverlay" class="hidden absolute inset-0 bg-white/70 flex items-center justify-center z-50">
+      <div class="w-12 h-12 border-4 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
+    </div>
+
+    <form id="loanForm" class="space-y-4">
 
       <!-- Full Name -->
       <div>
@@ -27,29 +32,25 @@
                class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
       </div>
 
-      
-      <!-- Date of Birth & Age -->
+      <!-- Date of Birth -->
       <div class="flex gap-4">
         <div class="flex-1">
           <label for="dateOfBirth" class="block mb-1 text-sm font-medium">Date of Birth</label>
           <input type="date" id="dateOfBirth" name="dateOfBirth" required
                  class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
         </div>
-        
       </div>
 
       <!-- Gender -->
-  <div class="mb-4">
-      <label for="gender" class="block text-gray-700 font-semibold mb-2">Gender</label>
-      <select id="gender" name="gender" required
-            class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:border-blue-300">
-            <option value="">-- Select Gender --</option>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-            
-      </select>
-  </div>
-
+      <div>
+        <label for="gender" class="block mb-1 text-sm font-medium">Gender</label>
+        <select id="gender" name="gender" required
+                class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:border-blue-300">
+          <option value="">-- Select Gender --</option>
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+        </select>
+      </div>
 
       <!-- Phone -->
       <div>
@@ -99,52 +100,75 @@
                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
       </div>
 
+      <!-- File Upload with custom button -->
+      <div>
+        <label class="block mb-1 text-sm font-medium">Supporting Document</label>
+        <div class="flex items-center gap-2">
+          <button type="button" id="fileBtn" class="px-4 py-2 border rounded bg-gray-100 hover:bg-gray-200">Choose File</button>
+          <span id="fileName" class="text-sm text-gray-600">No file selected</span>
+        </div>
+        <input type="file" id="file" name="file" class="hidden">
+      </div>
+
       <!-- Submit Button -->
-      <div class="text-center" >
-        <button type="submit"  id="submitBtn"  class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors w-full">
+      <div>
+        <button type="submit" id="submitBtn" class="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600 transition">
           Submit Application
         </button>
       </div>
-      <!-- Hidden loading indicator -->
-      <div id="loading" class="hidden text-center">
-        <div class="animate-spin h-6 w-6 border-4 border-blue-500 border-t-transparent rounded-full mx-auto"></div>
-        <p class="mt-2 text-gray-600">Submitting, please wait...</p>
-      </div>
+
     </form>
   </div>
 
-  <!-- Spinner container -->
-<div id="spinner" class="fixed inset-0 flex items-center justify-center bg-white bg-opacity-75 hidden">
-  <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-600"></div>
-</div>
-
 <script>
-    const form = document.getElementById("loanForm");
-    const spinner = document.getElementById("spinner");
+const form = document.getElementById("loanForm");
+const spinner = document.getElementById("spinnerOverlay");
 
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      spinner.classList.remove("hidden");
+const fileInput = document.getElementById("file");
+const fileBtn = document.getElementById("fileBtn");
+const fileName = document.getElementById("fileName");
 
-      const formData = new FormData(form);
+fileBtn.addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", () => {
+  if (fileInput.files.length > 0) fileName.textContent = fileInput.files[0].name;
+});
 
-      try {
-        const res = await fetch("/submit", { method: "POST", body: formData });
-        const data = await res.json();
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
 
-        if (data.id) {
-          // Redirect to submission page with inserted record id
-          window.location.href = `submission.html?id=${data.id}`;
-        } else {
-          alert("Submission failed. Please try again.");
-        }
-      } catch (err) {
-        console.error(err);
-        alert("Unexpected error occurred.");
-      } finally {
-        spinner.classList.add("hidden");
-      }
-    });
-  </script>
+  spinner.classList.remove("hidden"); // show spinner immediately
+
+  try {
+    // Upload file first
+    const file = fileInput.files[0];
+    if (!file) throw new Error("Please select a file");
+
+    const fileData = new FormData();
+    fileData.append("file", file);
+
+    const fileRes = await fetch("/upload/r2", { method: "POST", body: fileData });
+    const fileJson = await fileRes.json();
+    if (fileJson.error) throw new Error("File upload failed: " + fileJson.error);
+
+    // Prepare loan form data
+    const formData = new FormData(form);
+    formData.delete("file"); // remove raw file
+    formData.append("file_url", fileJson.file_url);
+
+    // Submit the loan application
+    const res = await fetch("/submit", { method: "POST", body: formData });
+    const data = await res.json();
+
+    if (!data.id) throw new Error(data.error || "Submission failed");
+
+    window.location.href = `submission.html?id=${data.id}`;
+  } catch (err) {
+    console.error(err);
+    alert(err.message);
+  } finally {
+    spinner.classList.add("hidden"); // hide spinner if error occurs
+  }
+});
+</script>
 </body>
 </html>

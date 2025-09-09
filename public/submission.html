@@ -19,8 +19,7 @@
 
     <!-- Apply Button (hidden until eligible) -->
     <div class="text-center mt-6">
-      <button id="applyBtn"
-        class="hidden bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 transition">
+      <button id="applyBtn" class="hidden bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 transition">
         Apply for Loan
       </button>
     </div>
@@ -35,24 +34,26 @@
     const id = params.get("id");
 
     async function fetchSubmission() {
-      if (!id) return;
+      if (!id) {
+        document.getElementById('spinner').classList.add('hidden');
+        const container = document.getElementById('submission-details');
+        container.classList.remove('hidden');
+        container.innerHTML = `<p class="text-red-600">No submission ID provided.</p>`;
+        return;
+      }
 
       try {
         const res = await fetch(`/loans/${id}`);
-        if (!res.ok) throw new Error("Failed to fetch submission");
+        if (!res.ok) throw new Error(`Server returned status ${res.status}`);
 
         const data = await res.json();
-        console.log("Fetched submission:", data);
-
-        // Hide spinner
         document.getElementById('spinner').classList.add('hidden');
-
-        // Show submission details
         const container = document.getElementById('submission-details');
         container.classList.remove('hidden');
 
+        // Render all main submission details
         container.innerHTML = `
-          <p>Your submission has been received successfully!</p>
+          <p class="font-semibold text-lg">Your submission has been received!</p>
           <p><strong>Full Name:</strong> ${data.fullName || "N/A"}</p>
           <p><strong>Email:</strong> ${data.email || "N/A"}</p>
           <p><strong>Phone:</strong> ${data.phone || "N/A"}</p>
@@ -63,14 +64,37 @@
           <p><strong>Employment:</strong> ${data.employment || "N/A"}</p>
           <p><strong>Income:</strong> ${data.income || "N/A"}</p>
           <p><strong>Loan Purpose:</strong> ${data.loanPurpose || "N/A"}</p>
+        `;
+
+        // Display uploaded file (if any)
+        if (data.file_url) {
+          const fileType = data.file_url.split('.').pop().toLowerCase();
+          let fileElement = '';
+
+          if (['jpg','jpeg','png','gif','webp'].includes(fileType)) {
+            fileElement = `<p><strong>Uploaded File:</strong></p>
+                           <img src="${data.file_url}" alt="Uploaded File" class="max-w-full rounded mt-1" />`;
+          } else {
+            fileElement = `<p><strong>Uploaded File:</strong> <a href="${data.file_url}" target="_blank" class="text-blue-600 hover:underline">View/Download</a></p>`;
+          }
+
+          container.innerHTML += fileElement;
+        }
+
+        // Eligibility info
+        container.innerHTML += `
           <hr class="my-2">
           <p class="font-bold">Eligibility</p>
           <p><strong>Best Product:</strong> ${data.best_product || "N/A"}</p>
           <p><strong>Eligible:</strong> ${data.eligible || "No"}</p>
           <p><strong>Eligibility Score:</strong> ${data.eligibility_score || 0}</p>
           <p><strong>Eligibility Reasons:</strong> ${data.eligibility_reasons || "N/A"}</p>
+        `;
+
+        // Gemini AI analysis
+        container.innerHTML += `
           <hr class="my-2">
-          <p class="font-bold">Gemini API Analysis</p>
+          <p class="font-bold">Gemini AI Analysis</p>
           <p><strong>Risk Score:</strong> ${data.gemini_score || 0}</p>
           <p><strong>Recommendation:</strong> ${data.gemini_recommendation || "N/A"}</p>
           <p><strong>Reasoning:</strong> ${data.gemini_reasoning || "N/A"}</p>
@@ -103,7 +127,7 @@
         document.getElementById('spinner').classList.add('hidden');
         const container = document.getElementById('submission-details');
         container.classList.remove('hidden');
-        container.innerHTML = `<p class="text-red-600">Failed to load submission details.</p>`;
+        container.innerHTML = `<p class="text-red-600">Failed to load submission details: ${err.message}</p>`;
       }
     }
 

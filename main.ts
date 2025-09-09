@@ -11,10 +11,12 @@ import { ProductMatcher } from "./productMatcher.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_KEY = Deno.env.get("SUPABASE_KEY");
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+const CLOUDINARY_ACCOUNT = Deno.env.get("CLOUDINARY_ACCOUNT");
+const CLOUDINARY_UPLOAD_PRESET = Deno.env.get("CLOUDINARY_UPLOAD_PRESET");
 
-if (!SUPABASE_URL || !SUPABASE_KEY || !GEMINI_API_KEY) {
+if (!SUPABASE_URL || !SUPABASE_KEY || !GEMINI_API_KEY || !CLOUDINARY_ACCOUNT || !CLOUDINARY_UPLOAD_PRESET) {
   throw new Error(
-    "Missing environment variables. Set SUPABASE_URL, SUPABASE_KEY, GEMINI_API_KEY"
+    "Missing environment variables. Ensure SUPABASE_URL, SUPABASE_KEY, GEMINI_API_KEY, CLOUDINARY_ACCOUNT, CLOUDINARY_UPLOAD_PRESET are set."
   );
 }
 
@@ -22,7 +24,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const app = new Hono();
 
 // -------------------
-// Helper
+// Helper: Calculate Age
 // -------------------
 function calculateAge(dob: string): number {
   if (!dob) return 0;
@@ -68,17 +70,46 @@ app.options("*", () => {
 });
 
 // -------------------
-// API Routes
+// POST /submit - Loan submission
 // -------------------
-
-// POST /submit
-// POST /submit
 app.post("/submit", async (c) => {
   try {
+    // Get the form data
     const formData = await c.req.formData();
-    const data: Record<string, unknown> = {};
+
+    // --- Logging for debugging ---
+    console.log("Form data received:", Object.fromEntries(formData.entries()));
+    const file = formData.get("file") as File | null;
+    console.log("File object:", file);
+
+    const data: Record<string, any> = {};
     for (const [key, value] of formData.entries()) data[key] = value;
 
+    // --- File Upload ---
+    if (file) {
+      try {
+        const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_ACCOUNT}/upload`;
+        const uploadData = new FormData();
+        uploadData.append("file", file);
+        uploadData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+        const res = await fetch(cloudinaryUrl, { method: "POST", body: uploadData });
+        const result = await res.json();
+
+        if (!res.ok) {
+          console.error("Cloudinary upload error:", result);
+          return c.json({ error: result.error?.message || "File upload failed" }, 500);
+        }
+
+        data.file_url = result.secure_url;
+        console.log("File uploaded successfully:", data.file_url);
+      } catch (err) {
+        console.error("Error during Cloudinary upload:", err);
+        return c.json({ error: "Cloudinary upload exception: " + err.message }, 500);
+      }
+    }
+
+    // --- Gemini AI Risk Analysis ---
     const intent = {
       amount: Number(data.loanAmount),
       age: calculateAge(String(data.dateOfBirth)),
@@ -88,10 +119,8 @@ app.post("/submit", async (c) => {
       purpose: String(data.loanPurpose),
     };
 
-    // -------------------------------
-    // Gemini AI Risk Analysis
-    // -------------------------------
-    const geminiPrompt = `
+    try {
+      const geminiPrompt = `
 Analyze this loan applicant and return valid JSON:
 {
   "riskScore": number (0 = low risk, 100 = high risk),
@@ -101,178 +130,142 @@ Analyze this loan applicant and return valid JSON:
 Applicant data: ${JSON.stringify(intent)}
 `;
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${GEMINI_API_KEY}`;
-    const payload = { contents: [{ parts: [{ text: geminiPrompt }] }] };
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${GEMINI_API_KEY}`;
+      const payload = { contents: [{ parts: [{ text: geminiPrompt }] }] };
+      const geminiResp = await fetch(geminiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-    const geminiResp = await fetch(geminiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+      const geminiJson = await geminiResp.json();
+      const rawText = geminiJson?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+      const cleanText = rawText.replace(/```json|```/g, "").trim();
 
-    const geminiJson = await geminiResp.json();
+      let geminiData: { riskScore: number; recommendation: string; reasoning?: string };
+      try {
+        geminiData = JSON.parse(cleanText);
+      } catch {
+        geminiData = { riskScore: 50, recommendation: "Pending", reasoning: "Gemini response unparseable" };
+      }
 
-    // Try different possible Gemini response formats
-    const rawText =
-      geminiJson?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      geminiJson?.candidates?.[0]?.content?.[0]?.text ||
-      "{}";
+      data.gemini_score = geminiData.riskScore ?? 0;
+      data.gemini_recommendation = geminiData.recommendation ?? "Pending";
+      data.gemini_reasoning = geminiData.reasoning ?? "No reasoning";
+      data.gemini_eligible = geminiData.recommendation === "Approved" ? "Yes" : "No";
+    } catch (err) {
+      console.error("Gemini API error:", err);
+      data.gemini_score = 50;
+      data.gemini_recommendation = "Pending";
+      data.gemini_reasoning = "Gemini API failed";
+      data.gemini_eligible = "No";
+    }
 
-    const cleanText = rawText.replace(/```json|```/g, "").trim();
-
-    let geminiData: { riskScore: number; recommendation: string; reasoning?: string };
-
+    // --- Product Matching ---
     try {
-      geminiData = JSON.parse(cleanText);
-    } catch {
-      console.error("Failed to parse Gemini JSON:", cleanText);
-      geminiData = {
-        riskScore: 50,
-        recommendation: "Pending",
-        reasoning: "Gemini response unparseable",
-      };
+      const productMatcher = new ProductMatcher();
+      const matches = productMatcher.findMatches(intent, loanProducts);
+      const trulyEligible = matches.filter(m => m.eligible && intent.amount >= Number(m.product.minAmount) && intent.amount <= Number(m.product.maxAmount));
+      const eligibleMatch = trulyEligible.length > 0
+        ? trulyEligible.reduce((prev, curr) => curr.score > prev.score ? curr : prev)
+        : matches.reduce((prev, curr) => curr.score > prev.score ? curr : prev);
+
+      data.eligible_product = trulyEligible.length > 0 ? "Yes" : "No";
+      data.eligibility_score = eligibleMatch.score;
+      data.eligibility_reasons = eligibleMatch.reasons.join(", ") + (trulyEligible.length === 0 ? " | Requested amount below minimum" : "");
+      data.best_product = eligibleMatch.product.name;
+      data.eligible = data.gemini_eligible === "Yes" || data.eligible_product === "Yes" ? "Yes" : "No";
+    } catch (err) {
+      console.error("Product matching error:", err);
+      data.eligible_product = "No";
+      data.eligibility_score = 0;
+      data.eligibility_reasons = "Product matching failed";
+      data.best_product = "None";
+      data.eligible = "No";
     }
 
-    data["gemini_score"] = geminiData.riskScore ?? 0;
-    data["gemini_recommendation"] = geminiData.recommendation ?? "Pending";
-    data["gemini_reasoning"] = geminiData.reasoning ?? "No reasoning";
-    data["gemini_eligible"] = geminiData.recommendation === "Approved" ? "Yes" : "No";
-
-    // -------------------------------
-    // Local Product Matching
-    // -------------------------------
-    const productMatcher = new ProductMatcher();
-    const matches = productMatcher.findMatches(intent, loanProducts);
-
-    console.log("=== Product Matching Debug ===");
-    console.log("Intent Amount:", intent.amount);
-    console.log("All Matches:");
-    matches.forEach((m, i) => {
-      console.log(
-        `#${i + 1} Product: ${m.product.name}, Eligible: ${m.eligible}, Score: ${m.score}, Min: ${m.product.minAmount}, Max: ${m.product.maxAmount}, Reasons: ${m.reasons.join(", ")}`
-      );
-    });
-
-    const trulyEligible = matches.filter(
-      (m) =>
-        m.eligible &&
-        intent.amount >= Number(m.product.minAmount) &&
-        intent.amount <= Number(m.product.maxAmount)
-    );
-
-    console.log("Truly Eligible Products:", trulyEligible);
-
-    let eligibleMatch = null;
-
-    if (trulyEligible.length > 0) {
-      eligibleMatch = trulyEligible.reduce((prev, curr) =>
-        curr.score > prev.score ? curr : prev
-      );
-      data["eligible_product"] = "Yes";
-      data["eligibility_score"] = eligibleMatch.score;
-      data["eligibility_reasons"] = eligibleMatch.reasons.join(", ");
-      data["best_product"] = eligibleMatch.product.name;
-    } else {
-      const closestMatch = matches.reduce((prev, curr) =>
-        curr.score > prev.score ? curr : prev
-      );
-      eligibleMatch = closestMatch;
-      data["eligible_product"] = "No";
-      data["eligibility_score"] = eligibleMatch.score;
-      data["eligibility_reasons"] =
-        eligibleMatch.reasons.join(", ") + " | Requested amount below minimum";
-      data["best_product"] = eligibleMatch.product.name;
+    // --- Insert into Supabase ---
+    try {
+      const { data: insertedData, error } = await supabase.from("Afropavo").insert([data]).select().single();
+      if (error || !insertedData) {
+        console.error("Supabase insert error:", error);
+        return c.json({ error: error?.message || "Insert failed" }, 500);
+      }
+      console.log("Data inserted successfully:", insertedData);
+      return c.json(insertedData);
+    } catch (err) {
+      console.error("Supabase exception:", err);
+      return c.json({ error: "Supabase insert exception: " + err.message }, 500);
     }
 
-    // -------------------------------
-    // Final Eligibility (OR condition)
-    // -------------------------------
-    data["eligible"] =
-      data["gemini_eligible"] === "Yes" || data["eligible_product"] === "Yes"
-        ? "Yes"
-        : "No";
-
-    // -------------------------------
-    // Insert into Supabase
-    // -------------------------------
-    const { data: insertedData, error } = await supabase
-      .from("Afropavo")
-      .insert([data])
-      .select()
-      .single();
-
-    if (error || !insertedData) {
-      console.error("Supabase insert error:", error);
-      return new Response(
-        JSON.stringify({ error: error?.message || "Insert failed" }),
-        { status: 500 }
-      );
-    }
-
-    return new Response(JSON.stringify(insertedData), {
-      status: 201,
-      headers: { "Content-Type": "application/json" },
-    });
   } catch (err) {
-    console.error(err);
-    return new Response(JSON.stringify({ error: "Unexpected error" }), {
-      status: 500,
-    });
+    console.error("Unexpected /submit error:", err);
+    return c.json({ error: "Unexpected error: " + err.message }, 500);
   }
 });
 
+// -------------------
+// POST /upload/r2 - File upload
+// -------------------
+app.post("/upload/r2", async (c) => {
+  try {
+    const form = await c.req.formData();
+    const file = form.get("file") as File;
+    if (!file) return c.json({ error: "No file uploaded" }, 400);
 
-// GET /loans
-app.get("/loans", async (c) => {
-  const { data, error } = await supabase
-    .from("Afropavo")
-    .select("*")
-    .order("created_at", { ascending: false });
-  if (error) {
-    console.error("Supabase fetch error:", error);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+    const uploadData = new FormData();
+    uploadData.append("file", file);
+    uploadData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+    const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_ACCOUNT}/upload`;
+
+    const res = await fetch(cloudinaryUrl, { method: "POST", body: uploadData });
+    const result = await res.json();
+
+    if (!res.ok) return c.json({ error: result.error?.message || "Upload failed" }, 500);
+
+    return c.json({ file_url: result.secure_url });
+
+  } catch (err) {
+    console.error("Upload error:", err);
+    return c.json({ error: err.message }, 500);
   }
+});
+
+// -------------------
+// GET all loans
+// -------------------
+app.get("/loans", async (c) => {
+  const { data, error } = await supabase.from("Afropavo").select("*").order("created_at", { ascending: false });
+  if (error) return c.json({ error: error.message }, 500);
   return c.json(data);
 });
 
-// GET /loans/:id
+// -------------------
+// GET single loan by id
+// -------------------
 app.get("/loans/:id", async (c) => {
   const id = c.req.param("id");
-  const { data, error } = await supabase
-    .from("Afropavo")
-    .select("*")
-    .eq("id", id)
-    .single();
-  if (error) {
-    console.error("Supabase fetch error:", error);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
-  }
+  const { data, error } = await supabase.from("Afropavo").select("*").eq("id", id).single();
+  if (error) return c.json({ error: error.message }, 500);
   return c.json(data);
 });
 
-// PUT /loans/:id
+// -------------------
+// UPDATE loan by id
+// -------------------
 app.put("/loans/:id", async (c) => {
   const id = c.req.param("id");
   const body = await c.req.json();
-  const { data, error } = await supabase
-    .from("Afropavo")
-    .update(body)
-    .eq("id", id);
-  if (error) {
-    console.error("Supabase update error:", error);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
-  }
+  const { data, error } = await supabase.from("Afropavo").update(body).eq("id", id);
+  if (error) return c.json({ error: error.message }, 500);
   return c.json(data);
 });
 
 // -------------------
-// Dashboard Routing
+// Dashboard & static files
 // -------------------
-
-// Redirect root "/" to /dashboard
 app.get("/", (c) => c.redirect("/dashboard"));
-
-// Serve /dashboard explicitly
 app.get("/dashboard", async (c) => {
   const path = join("public", "index.html");
   try {
@@ -283,14 +276,13 @@ app.get("/dashboard", async (c) => {
   }
 });
 
-// Serve all other static files (JS, CSS, images)
+// Serve static files
 app.get("/*", async (c) => {
   const reqPath = c.req.path === "/" ? "/index.html" : c.req.path;
-   const path = join("public", reqPath);
+  const path = join("public", reqPath);
 
   try {
     const body = await Deno.readFile(path);
-
     let contentType = "text/plain";
     const ext = extname(path).toLowerCase();
     if (ext === ".html") contentType = "text/html";
@@ -310,6 +302,5 @@ app.get("/*", async (c) => {
 // -------------------
 // Start server
 // -------------------
-const server = Deno.serve({ port: 8000 }, (req) => app.fetch(req));
-console.log(`Server running at http://localhost:8000`);
-
+console.log("Server running at http://localhost:8000");
+Deno.serve({ port: 8000 }, (req) => app.fetch(req));
